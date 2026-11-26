@@ -8,7 +8,7 @@ Sections are added milestone by milestone:
 
 1. [Cleaning and hardening](#1-cleaning-and-hardening) (`sql/10`–`30`)
 2. [Overselling and the audit trail](#2-overselling-and-the-audit-trail) (`sql/40`–`50`)
-3. Low-stock rollup: *to follow*
+3. [Low-stock rollup](#3-low-stock-rollup) (`sql/60`)
 4. Monday report: *to follow*
 
 ---
@@ -264,3 +264,86 @@ memo; it is configuration Kloud Kart's team must own.
   answered with `success = false` and a reason, never with a crash.
 - Parameters are used as values, never concatenated into SQL, so there is no
   injection path.
+
+---
+
+## 3. Low-stock rollup
+
+### 3.1 What "low" means (the brief leaves it open)
+
+**Decision.** Each product has a `reorder_level`. A product is **out of stock**
+at 0 and **low** when `0 < stock ≤ reorder_level`. The level is seeded as **two
+weeks of that product's own sales**, averaged over the last 8 weeks of trading
+(minimum 1). New products default to 10, which is two weeks at the median
+product's rate of about 4.6 units a week.
+
+**Why not a single threshold.** Median stock is only 12 units, so "≤ 10 units"
+flags **1,949 of 4,023 products (48%)**: not "at a glance". It also treats a
+product that sells 1 a month the same as one that sells 20 a week.
+
+**Why stored, not computed live.** It lets operations override individual
+products (seasonal lines, slow suppliers). It keeps the view from scanning
+280k movements on every refresh. And the extract ends in August 2026, so "the
+last 8 weeks before today" would contain no sales at all; the seed uses the
+last 8 weeks *of the data*.
+
+**Assumptions.** The supplier lead time is unknown, so two weeks of cover is a
+judgement. Kloud Kart runs lean (median stock is about 2.6 weeks of sales), so
+even this rule flags 1,385 products as low and 591 as out. **Cost if wrong:**
+too low a level means late reorders and stock-outs; too high means a noisy list.
+Either way it is one `UPDATE` per product or category, owned by operations.
+
+### 3.2 How the tree is walked
+
+**Decision.** A recursive query (`WITH RECURSIVE`) at read time, in three views:
+
+| View | Shows |
+|---|---|
+| `category_tree` | Every category with its depth and full path (`Electronics > Phones > Phone Accessories > Cases`) |
+| `low_stock_by_category` | For each category, its **whole subtree** at any depth: products, out of stock, low, units on hand. One `(Uncategorised)` row, so the 37 products without a category are never invisible |
+| `low_stock_products` | The drill-down: every out or low product with its category path, most urgent first |
+
+**Depth is never assumed.** The recursion follows `parent_id` until it runs
+out. A test hangs three new levels under Cases and checks the product rolls up
+through all seven.
+
+**It cannot hang.** Both recursive views use the SQL-standard `CYCLE` clause, so
+a loop ends the walk instead of running forever. That is the second line of
+defence; the trigger from section 1.4 refuses loops in the first place. A test
+bypasses the trigger, forces Electronics under its own grandchild, and checks
+both views still answer within 5 seconds.
+
+**Rejected alternatives.**
+
+| Alternative | Why not |
+|---|---|
+| Fixed self-joins (category → parent → grandparent → …) | Hard-codes the depth, which the brief forbids; breaks the day marketing adds a fifth level. |
+| A closure table (every ancestor–descendant pair stored) maintained by triggers | Fast reads, but a second copy of the tree that must be kept in sync on every edit. With 94 categories, and 5,000 still read in under 0.25 s, there is nothing to buy with that complexity. |
+| `ltree` materialised paths | An extension plus a path column to maintain; same synchronisation burden as a closure table. |
+| A materialised view refreshed on a schedule | Faster still, but stale between refreshes, which is wrong for a stock screen during a flash sale. |
+
+### 3.3 Performance: measured before and after
+
+`benchmarks/low_stock_at_scale.sql` builds, inside a rolled-back transaction,
+a ragged tree **50× today's size**: 5,095 categories, 11 levels, 204,023
+products.
+
+| Version | Today (94 categories, 4,023 products) | 50× scale |
+|---|---|---|
+| First version: join each product to every ancestor, then aggregate | 17 ms | **3.66 s** (over budget) |
+| **Chosen: aggregate per category first, then roll the totals up** | **8 ms** | **0.16–0.24 s** |
+| Drill-down, 50 most urgent products | 19 ms | 0.04–0.10 s |
+
+The first version copied every product once per ancestor level, about 1.2
+million rows at scale. Aggregating first rolls up only one row per category.
+The answer is identical; the tests check the rollup arithmetic at every node.
+
+**A trap found while measuring.** After the benchmark, the real rollup suddenly
+took 600 ms. `EXPLAIN ANALYZE` showed why. `ANALYZE` row estimates are **not**
+rolled back with a transaction, so the planner still believed the 5,000-category
+tree existed. It over-estimated the work, switched on JIT compilation, and
+spent 576 ms compiling an 8 ms query. The benchmark now re-runs `ANALYZE`
+after its rollback. The general lesson for Kloud Kart's team: stale statistics
+can make a fast query slow without any change to the query; autovacuum keeps
+them fresh in normal operation. Worst case, the JIT cost adds about 0.6 s, which
+is still inside the "couple of seconds" budget.

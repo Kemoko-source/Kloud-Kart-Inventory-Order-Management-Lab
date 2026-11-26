@@ -68,6 +68,18 @@ reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
 | `sql/30_constraints.sql` | Foreign keys with their indexes, CHECK rules, NOT NULLs, and a trigger that refuses category loops |
 | `sql/40_audit_trail.sql` | Links each sale movement to its order; makes `inventory_log` append-only and archives any deletion |
 | `sql/50_place_order.sql` | `place_order()`: atomic, oversell-proof order placement with a clean "out of stock" |
+| `sql/60_low_stock.sql` | Per-product `reorder_level`; views `category_tree`, `low_stock_by_category` (rollup at any depth) and `low_stock_products` (drill-down) |
+
+## Using the low-stock views
+
+```sql
+-- At a glance: the tree, each category covering its whole subtree
+SELECT path, products, out_of_stock, low_stock FROM low_stock_by_category ORDER BY path;
+
+-- Drill down: most urgent first
+SELECT product_name, category_path, stock_quantity, reorder_level, stock_status
+FROM low_stock_products ORDER BY units_below_reorder_level DESC LIMIT 50;
+```
 
 ## Tests
 
@@ -79,6 +91,7 @@ This runs:
 
 - `tests/constraints_test.sql`: the schema refuses each diagnosed problem
 - `tests/place_order_test.sql`: refusals, linked writes, append-only ledger
+- `tests/low_stock_test.sql`: rollup arithmetic at every node, any depth, still answers with a loop in the tree
 - `race_test.py`, unmodified: concurrency under contention
 
 The SQL tests run in rolled-back transactions and leave no trace.
@@ -88,6 +101,13 @@ To run the concurrency test on its own:
 ```bash
 docker compose run --rm racetest              # all four tests
 docker compose run --rm racetest --test 2     # flash sale only
+```
+
+## Benchmarks
+
+```bash
+# Low-stock rollup on a synthetic tree 50x today's size (rolled back afterwards)
+docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/low_stock_at_scale.sql
 ```
 
 ## Experiment: would triggers alone have fixed overselling?
