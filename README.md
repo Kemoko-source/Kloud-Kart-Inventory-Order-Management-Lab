@@ -19,6 +19,7 @@ Everything runs on plain PostgreSQL: no new infrastructure.
 |---|---|
 | `M03_Resources/` | The data bundle exactly as provided: schema, load script, CSVs and `race_test.py` (unmodified) |
 | `sql/` | Solution scripts, applied in numeric order after a fresh load |
+| `diagnosis/` | Read-only SQL checks behind every number in the diagnosis |
 | `docs/` | Data diagnosis, design decisions, memo to Nana |
 | `scripts/rebuild.sh` | Fresh load plus every solution script, top to bottom |
 | `tests/` | Container definition for running `race_test.py` |
@@ -44,6 +45,16 @@ docker compose up -d db           # PostgreSQL 18 with max_connections=500
 
 If you already run the course's `kloudkart` container on port 5432, stop it
 (`docker stop kloudkart`) or set `POSTGRES_PORT` in `.env` to a free port.
+
+## Data diagnosis
+
+Ranked findings are in [`docs/01_data_diagnosis.md`](docs/01_data_diagnosis.md).
+Reproduce every number from a fresh load (read-only, about 5 seconds):
+
+```bash
+docker compose exec -T db psql -U kloudkart -d kloudkart \
+    -f /workspace/diagnosis/diagnosis_checks.sql
+```
 
 ## Running the concurrency test
 
