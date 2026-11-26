@@ -56,6 +56,24 @@ docker compose exec -T db psql -U kloudkart -d kloudkart \
     -f /workspace/diagnosis/diagnosis_checks.sql
 ```
 
+## Solution scripts
+
+Applied in order by `scripts/rebuild.sh` after the fresh load. Design
+reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
+
+| Script | What it does |
+|---|---|
+| `sql/10_foundations.sql` | Audit tables (`data_quarantine`, `data_corrections`) and identity columns for safe ID generation |
+| `sql/20_clean.sql` | Fixes the diagnosed problems in one transaction, recording every removal and correction, then checks invariants; creates the `products_to_recount` view |
+| `sql/30_constraints.sql` | Foreign keys with their indexes, CHECK rules, NOT NULLs, and a trigger that refuses category loops |
+
+## Tests
+
+```bash
+# The schema refuses each diagnosed problem (rolled back, leaves no trace)
+docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/constraints_test.sql
+```
+
 ## Running the concurrency test
 
 ```bash
