@@ -7,7 +7,7 @@ something open, the assumption is marked **Assumption**.
 Sections are added milestone by milestone:
 
 1. [Cleaning and hardening](#1-cleaning-and-hardening) (`sql/10`–`30`)
-2. Overselling: *to follow*
+2. [Overselling and the audit trail](#2-overselling-and-the-audit-trail) (`sql/40`–`50`)
 3. Low-stock rollup: *to follow*
 4. Monday report: *to follow*
 
@@ -124,3 +124,143 @@ decided in section 4, with before/after measurements.
   still works. It runs in a rolled-back transaction.
 - The full rebuild (fresh load plus scripts) takes about 15 seconds and is
   re-runnable.
+
+---
+
+## 2. Overselling and the audit trail
+
+### 2.1 The cause: "check, then act" in two steps
+
+Last month's two oversells came from a gap between *reading* the stock and
+*writing* the sale. Two buyers both read "1 left", both pass the check, and
+both write. Anything that keeps the check and the write as two separate steps
+keeps the gap, however fast the steps are.
+
+### 2.2 Decision: one atomic conditional decrement
+
+`place_order()` takes stock with a single statement:
+
+```sql
+UPDATE products SET stock_quantity = stock_quantity - p_quantity
+WHERE product_id = p_product_id AND stock_quantity >= p_quantity
+```
+
+At PostgreSQL's default isolation level (READ COMMITTED), a second buyer's
+UPDATE on the same row **waits** for the first buyer's row lock. When the first
+commits, PostgreSQL **re-reads the current row and re-checks the `WHERE`**. If
+the stock is gone, the UPDATE matches no row and the function returns
+`success = false`, "Out of stock: … requested, … available". The check and the
+decrement are one indivisible step, so a unit cannot be sold twice, and
+nothing can fail with a serialization error, so there is nothing to retry.
+
+The order, its line and the sale movement are written in the same transaction
+as the decrement: no order without its stock movement, and no movement without
+its order. `CHECK (stock_quantity >= 0)` remains as a backstop for any other
+code path that touches stock.
+
+### 2.3 Would triggers alone have fixed it? No: measured, not argued
+
+"Use triggers" usually means the application keeps its flow (check stock, then
+write the order) and a trigger on `order_items` takes the stock, so nobody can
+forget to. `experiments/trigger_only.sql` builds exactly that, and
+`scripts/run_trigger_experiment.sh` runs the **unmodified** `race_test.py`
+against it in a throwaway copy of the database. Full output is in
+[`docs/evidence/`](evidence/).
+
+| Design | Flash sale: 400 buyers, 50 units | Last unit, 25 rounds |
+|---|---|---|
+| Triggers only | **400 sold; stock ends at −350** | 25/25 rounds oversold |
+| Triggers + `CHECK (stock >= 0)` | 50 sold, but **350 buyers get a database error** instead of "out of stock" | 25/25 rounds fail |
+| **`place_order()` (chosen)** | **Exactly 50 sold, 350 clean refusals, 0 errors** | **25/25 correct** |
+
+A trigger runs *inside* the writing transaction, after the application has
+already decided to sell. It can do only two things with an oversell: let it
+happen, or abort with an error. An error cannot tell the customer "out of
+stock"; it tells the application "something crashed". The trigger was never the
+mechanism that mattered: the atomic check-and-decrement is, wherever it lives.
+A trigger can host that same `UPDATE … WHERE stock >= qty`, but it still has
+only an exception to report failure with, which breaks the instant, clear "out
+of stock" Nana promised.
+
+**What a naive build would have cost.** In the first flash sale: 350 orders for
+stock that does not exist, which means 350 refunds and apologies in ten
+seconds, against the two last month.
+
+### 2.4 Alternatives rejected
+
+| Alternative | Correct? | Why not |
+|---|---|---|
+| `SELECT … FOR UPDATE`, check in code, then `UPDATE` | Yes | Takes the same row lock in two statements and more code. The single conditional UPDATE is the same lock with less to get wrong. |
+| `SERIALIZABLE` isolation | Yes, no oversell | Under contention it aborts transactions with serialization failures. These cannot be retried inside the function, because the transaction is already dead. They would reach the caller, which the contract forbids, and 400 buyers on one row would mostly fail and retry: a retry storm at the worst moment. |
+| Optimistic locking (version column, retry on conflict) | Yes | Same retry storm: with 400 buyers on one row, nearly every first attempt conflicts. |
+| Advisory lock per product | Yes | A second locking mechanism alongside the row lock that already exists. |
+| Queue or lock outside the database (Redis, message broker) | Yes | New infrastructure and a monthly bill, which the brief rules out. |
+
+### 2.5 Flash-sale readiness: measured
+
+| Measurement | Result |
+|---|---|
+| `race_test.py`, full suite | **Passed 11 of 11 consecutive runs** (275 last-unit races, 4,400 flash-sale attempts, 0 oversold, 0 errors) |
+| One `place_order` call, warm connection | about 2 ms when it sells, about 1 ms when it refuses |
+| Same, first call on a new connection | about 7 ms (the server process loads its caches) |
+| Flash sale in the test (400 *new* connections at once, 8 CPUs) | about 4 s wall clock. Median 0.45 s to buy, 1.5 s to be refused |
+
+The test's latency is dominated by 400 brand-new server processes starting at
+the same instant, not by the lock. In production the application reuses a pool
+of warm connections. At about 2 ms per sale, one product's row can take roughly
+**400–500 sales a second**; the flash sale needs 40 a second (400 in 10 s).
+
+**Fast refusal.** Before queuing for the lock, `place_order()` does a plain,
+lock-free read of the stock, and refuses at once if there is not enough. This
+can only refuse early, never sell: every sale still goes through the atomic
+UPDATE, so a stale read cannot oversell. It means late buyers in a sold-out
+flash sale are not queued behind the winners only to be refused. In the test it
+cut the median refusal from 1.9 s to about 1.55 s; the rest is the connection
+start-up above.
+
+**What does not survive, and what to do about it:**
+- **400 simultaneous *direct* connections.** The test needs `max_connections =
+  500`. Each PostgreSQL connection is a process, so the application should
+  share a small pool of connections rather than open one per customer.
+- **Multi-product baskets.** The contract is one product per call. A basket
+  version must lock its products in a fixed order (`ORDER BY product_id`), or
+  two baskets holding the same two products in opposite order will deadlock.
+
+### 2.6 Decision: stock is taken at checkout, not at fulfilment
+
+Historically stock moved when an order shipped (diagnosis N5), which left the
+oversell window open between payment and shipping. New orders take stock at
+checkout and start as `pending`.
+
+**Consequence.** A cancelled order must return its stock. `place_order` does not
+cancel orders, so the cancellation path in the application needs a matching
+`correction` movement. This is flagged in the memo. **Assumption:** pending
+historical orders (placed before this change) did not reserve stock, so they
+are not re-reserved retroactively.
+
+### 2.7 The audit trail
+
+| Piece | What it gives the auditor |
+|---|---|
+| `inventory_log.order_id` | Each sale points to its order. **261,574 historical sales were linked**: each matched exactly one order on product and timestamp, none ambiguous. The 394 left unlinked belong to quarantined orders. |
+| Foreign key on `order_id`, `DEFERRABLE INITIALLY DEFERRED` | It cannot point at an order that does not exist. It is checked at commit rather than per statement, so a transaction may remove an order and its movements in either order. (The provided `race_test.py` cleans up orders first.) |
+| UPDATE and TRUNCATE refused by trigger | History cannot be rewritten. A wrong movement is fixed by adding a `correction`, which is itself visible. |
+| DELETE copied to `inventory_log_deleted` with database user and time | Deletion stays possible (test fixtures, data-protection requests), but never invisible. |
+
+**Rejected: refuse DELETE as well.** `race_test.py` deletes its own fixture
+movements, and it must run unmodified. A genuine data-protection deletion would
+also be blocked.
+
+**Limit, stated honestly.** A database superuser can disable triggers. Real
+tamper-resistance needs separate database roles: the application role gets
+INSERT on `inventory_log` but not UPDATE or DELETE. This is recommended in the
+memo; it is configuration Kloud Kart's team must own.
+
+### 2.8 Security of `place_order`
+
+- `SET search_path = public, pg_temp`: a caller cannot make the function use a
+  look-alike table planted in another schema.
+- Inputs are validated (quantity at least 1, customer and product exist) and
+  answered with `success = false` and a reason, never with a crash.
+- Parameters are used as values, never concatenated into SQL, so there is no
+  injection path.

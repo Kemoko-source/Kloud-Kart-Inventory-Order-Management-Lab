@@ -1,0 +1,171 @@
+ Container kloudkart-db Running 
+ Container kloudkart-db Waiting 
+ Container kloudkart-db Healthy 
+ Container kloudkartinventoryordermanagementlab-racetest-run-8a625d904455 Creating 
+ Container kloudkartinventoryordermanagementlab-racetest-run-8a625d904455 Created 
+race_test.py — Kloud Kart order placement under contention
+==================================================================
+  place_order found: place_order(p_customer_id bigint, p_product_id bigint, p_quantity integer)
+
+Test 1 — two buyers, one unit, 25 rounds
+        [  0] success=True order_id=1000946    13.2ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10023, RACE TEST FIXTURE T1 r0, null, 100.00, -1, 2026-11-26 22:38:55.8936).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10024, RACE TEST FIXTURE T1 r1, null, 100.00, -1, 2026-11-26 22:38:55.992903).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000948    13.2ms msg='Order placed' err=''
+        [  0] success=True order_id=1000950    14.6ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10025, RACE TEST FIXTURE T1 r2, null, 100.00, -1, 2026-11-26 22:38:56.086787).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10026, RACE TEST FIXTURE T1 r3, null, 100.00, -1, 2026-11-26 22:38:56.184292).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000952    13.2ms msg='Order placed' err=''
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10027, RACE TEST FIXTURE T1 r4, null, 100.00, -1, 2026-11-26 22:38:56.287097).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000954    11.7ms msg='Order placed' err=''
+        [  0] success=True order_id=1000956    13.7ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10028, RACE TEST FIXTURE T1 r5, null, 100.00, -1, 2026-11-26 22:38:56.373375).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10029, RACE TEST FIXTURE T1 r6, null, 100.00, -1, 2026-11-26 22:38:56.461922).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000958    11.8ms msg='Order placed' err=''
+        [  0] success=True order_id=1000960    13.1ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10030, RACE TEST FIXTURE T1 r7, null, 100.00, -1, 2026-11-26 22:38:56.553476).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10031, RACE TEST FIXTURE T1 r8, null, 100.00, -1, 2026-11-26 22:38:56.642199).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000962    12.5ms msg='Order placed' err=''
+        [  0] success=True order_id=1000964    11.6ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10032, RACE TEST FIXTURE T1 r9, null, 100.00, -1, 2026-11-26 22:38:56.735505).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10033, RACE TEST FIXTURE T1 r10, null, 100.00, -1, 2026-11-26 22:38:56.828822).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000966    11.8ms msg='Order placed' err=''
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10034, RACE TEST FIXTURE T1 r11, null, 100.00, -1, 2026-11-26 22:38:56.925427).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000968   240.5ms msg='Order placed' err=''
+        [  0] success=True order_id=1000970    71.4ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10035, RACE TEST FIXTURE T1 r12, null, 100.00, -1, 2026-11-26 22:38:57.580433).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10036, RACE TEST FIXTURE T1 r13, null, 100.00, -1, 2026-11-26 22:38:58.295085).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000972    39.7ms msg='Order placed' err=''
+        [  0] success=True order_id=1000974    77.4ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10037, RACE TEST FIXTURE T1 r14, null, 100.00, -1, 2026-11-26 22:38:58.678863).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000976    70.0ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10038, RACE TEST FIXTURE T1 r15, null, 100.00, -1, 2026-11-26 22:38:59.414051).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000978    74.5ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10039, RACE TEST FIXTURE T1 r16, null, 100.00, -1, 2026-11-26 22:39:00.119586).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000980    99.6ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10040, RACE TEST FIXTURE T1 r17, null, 100.00, -1, 2026-11-26 22:39:00.397664).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000982    83.3ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10041, RACE TEST FIXTURE T1 r18, null, 100.00, -1, 2026-11-26 22:39:00.788902).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000985    32.0ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10042, RACE TEST FIXTURE T1 r19, null, 100.00, -1, 2026-11-26 22:39:01.089616).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000987    66.1ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10043, RACE TEST FIXTURE T1 r20, null, 100.00, -1, 2026-11-26 22:39:01.302638).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000988    34.8ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10044, RACE TEST FIXTURE T1 r21, null, 100.00, -1, 2026-11-26 22:39:01.576276).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000990    37.2ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10045, RACE TEST FIXTURE T1 r22, null, 100.00, -1, 2026-11-26 22:39:01.809188).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=True order_id=1000992    28.8ms msg='Order placed' err=''
+        [  1] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10046, RACE TEST FIXTURE T1 r23, null, 100.00, -1, 2026-11-26 22:39:02.013833).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  0] success=None order_id=None     0.0ms msg='' err='CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"\nDETAIL:  Failing row contains (10047, RACE TEST FIXTURE T1 r24, null, 100.00, -1, 2026-11-26 22:39:02.187569).\nCONTEXT:  SQL statement "UPDATE products\n    SET stock_quantity = stock_quantity - NEW.quantity\n    WHERE product_id = NEW.product_id"\nPL/pgSQL function order_items_take_stock() line 3 at SQL statement\nSQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)\n    VALUES (v_order_id, p_product_id, p_quantity, v_price)"\nPL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement'
+        [  1] success=True order_id=1000994    52.9ms msg='Order placed' err=''
+  FAIL  round 0: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10023, RACE TEST FIXTURE T1 r0, null, 100.00, -1, 2026-11-26 22:38:55.8936).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  FAIL  round 0: 0 calls were refused, expected exactly 1
+  FAIL  round 1: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10024, RACE TEST FIXTURE T1 r1, null, 100.00, -1, 2026-11-26 22:38:55.992903).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  FAIL  round 1: 0 calls were refused, expected exactly 1
+  FAIL  round 2: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10025, RACE TEST FIXTURE T1 r2, null, 100.00, -1, 2026-11-26 22:38:56.086787).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  FAIL  round 2: 0 calls were refused, expected exactly 1
+  FAIL  round 3: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10026, RACE TEST FIXTURE T1 r3, null, 100.00, -1, 2026-11-26 22:38:56.184292).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  FAIL  round 3: 0 calls were refused, expected exactly 1
+  FAIL  round 4: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10027, RACE TEST FIXTURE T1 r4, null, 100.00, -1, 2026-11-26 22:38:56.287097).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  FAIL  round 4: 0 calls were refused, expected exactly 1
+  FAIL  25/25 rounds failed. A race that fails sometimes is the race Nana already has.
+
+Test 2 — flash sale: 400 buyers, 50 units
+        50 sold, 0 refused, 350 errored, wall clock 8.85s
+  FAIL  350 calls raised: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+
+==================================================================
+FAILED — 12 problem(s):
+  - round 0: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10023, RACE TEST FIXTURE T1 r0, null, 100.00, -1, 2026-11-26 22:38:55.8936).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  - round 0: 0 calls were refused, expected exactly 1
+  - round 1: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10024, RACE TEST FIXTURE T1 r1, null, 100.00, -1, 2026-11-26 22:38:55.992903).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  - round 1: 0 calls were refused, expected exactly 1
+  - round 2: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10025, RACE TEST FIXTURE T1 r2, null, 100.00, -1, 2026-11-26 22:38:56.086787).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  - round 2: 0 calls were refused, expected exactly 1
+  - round 3: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10026, RACE TEST FIXTURE T1 r3, null, 100.00, -1, 2026-11-26 22:38:56.184292).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  - round 3: 0 calls were refused, expected exactly 1
+  - round 4: unhandled error: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+DETAIL:  Failing row contains (10027, RACE TEST FIXTURE T1 r4, null, 100.00, -1, 2026-11-26 22:38:56.287097).
+CONTEXT:  SQL statement "UPDATE products
+    SET stock_quantity = stock_quantity - NEW.quantity
+    WHERE product_id = NEW.product_id"
+PL/pgSQL function order_items_take_stock() line 3 at SQL statement
+SQL statement "INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+    VALUES (v_order_id, p_product_id, p_quantity, v_price)"
+PL/pgSQL function place_order(bigint,bigint,integer) line 20 at SQL statement
+  - round 4: 0 calls were refused, expected exactly 1
+  - 25/25 rounds failed. A race that fails sometimes is the race Nana already has.
+  - 350 calls raised: CheckViolation: new row for relation "products" violates check constraint "products_stock_not_negative"
+

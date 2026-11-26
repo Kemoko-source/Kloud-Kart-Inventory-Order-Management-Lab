@@ -66,20 +66,39 @@ reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
 | `sql/10_foundations.sql` | Audit tables (`data_quarantine`, `data_corrections`) and identity columns for safe ID generation |
 | `sql/20_clean.sql` | Fixes the diagnosed problems in one transaction, recording every removal and correction, then checks invariants; creates the `products_to_recount` view |
 | `sql/30_constraints.sql` | Foreign keys with their indexes, CHECK rules, NOT NULLs, and a trigger that refuses category loops |
+| `sql/40_audit_trail.sql` | Links each sale movement to its order; makes `inventory_log` append-only and archives any deletion |
+| `sql/50_place_order.sql` | `place_order()`: atomic, oversell-proof order placement with a clean "out of stock" |
 
 ## Tests
 
 ```bash
-# The schema refuses each diagnosed problem (rolled back, leaves no trace)
-docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/constraints_test.sql
+./scripts/run_tests.sh
 ```
 
-## Running the concurrency test
+This runs:
+
+- `tests/constraints_test.sql`: the schema refuses each diagnosed problem
+- `tests/place_order_test.sql`: refusals, linked writes, append-only ledger
+- `race_test.py`, unmodified: concurrency under contention
+
+The SQL tests run in rolled-back transactions and leave no trace.
+
+To run the concurrency test on its own:
 
 ```bash
 docker compose run --rm racetest              # all four tests
 docker compose run --rm racetest --test 2     # flash sale only
 ```
+
+## Experiment: would triggers alone have fixed overselling?
+
+```bash
+./scripts/run_trigger_experiment.sh
+```
+
+This runs the unmodified `race_test.py` against a triggers-only design, in a
+throwaway copy of the database. Results are written to `docs/evidence/`, and
+are discussed in section 2.3 of the design decisions.
 
 ## Connecting manually
 
