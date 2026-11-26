@@ -1,0 +1,44 @@
+# Local stand-in for Kloud Kart's single PostgreSQL server.
+# Credentials come from .env (copy .env.example); nothing secret lives here.
+services:
+  db:
+    image: postgres:18              # the version the module is graded against
+    container_name: kloudkart-db
+    # race_test.py opens 400 connections at once; the default of 100 makes
+    # Test 2 hang at its barrier and look like a broken place_order().
+    command: ["postgres", "-c", "max_connections=500"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql   # PostgreSQL 18 images keep data under a versioned subdirectory here
+      - ./:/workspace:ro            # lets psql inside the container read the SQL and CSVs
+    working_dir: /workspace
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Runs the unmodified race_test.py against the db service.
+  # Usage: docker compose run --rm racetest
+  racetest:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      - ./M03_Resources:/app:ro
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["python", "race_test.py"]
+
+volumes:
+  pgdata:
