@@ -13,8 +13,16 @@ Companion to the provided race_test.py, in the same style. Three tests:
   3  No deadlock.        40 two-product orders, half with their lines in the
                          opposite product order, all cancelled at once.
 
-Usage (inside the racetest container, which has psycopg2):
+Usage (inside the racetest container, which has psycopg2 and gets
+DATABASE_URL from .env through docker-compose.yml):
     docker compose run --rm --entrypoint python racetest /tests/cancel_race_test.py
+
+Run directly on the host instead, DATABASE_URL must be set first; see the
+README's "Tests" section.
+
+Fixtures are products named 'CANCEL RACE FIXTURE ...' and their orders. They
+are removed at the end, and again at the start of every run, so anything a
+killed run left behind is cleared the next time the test runs.
 """
 
 from __future__ import annotations
@@ -36,7 +44,7 @@ SALE_BUYERS = 100
 DEADLOCK_ORDERS = 40
 
 PLACE_ORDER = "SELECT success, order_id, message FROM place_order(%s, %s, 1)"
-CANCEL_ORDER = "SELECT success, units_returned, message FROM cancel_order(%s)"
+CANCEL_ORDER = "SELECT success, units_returned, message FROM cancel_order(%s, 'cancel_race_test')"
 
 FAILURES: list[str] = []
 

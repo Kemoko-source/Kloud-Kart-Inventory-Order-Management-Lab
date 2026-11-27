@@ -11,17 +11,7 @@
 
 BEGIN;
 
-CREATE FUNCTION pg_temp.check(test_name text, condition boolean)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF condition IS NOT TRUE THEN
-        RAISE EXCEPTION 'FAIL  %', test_name;
-    END IF;
-    RAISE NOTICE 'ok    %', test_name;
-END
-$$;
+\ir test_helpers.sql
 
 -- Every product is counted once: roots plus "(Uncategorised)" = all products.
 SELECT pg_temp.check('roots + uncategorised account for every product exactly once',
@@ -86,12 +76,22 @@ ALTER TABLE categories DISABLE TRIGGER categories_prevent_cycle;
 UPDATE categories SET parent_id = 103 WHERE category_id = 101;
 SET LOCAL statement_timeout = '5s';
 
-SELECT count(*) AS rows_with_loop FROM low_stock_by_category \gset
+-- Returning at all proves termination; the checks below prove it did not
+-- return garbage: no category listed twice, never more rows than categories
+-- (+1 for "(Uncategorised)"), and the drill-down still lists every low product.
+SELECT count(*)                     AS rows_with_loop,
+       count(DISTINCT category_id)  AS distinct_categories_with_loop,
+       count(*) FILTER (WHERE category_id IS NULL) AS uncategorised_rows
+FROM low_stock_by_category \gset
 SELECT pg_temp.check('rollup still returns, in under 5 s, with a loop in the tree',
     :rows_with_loop > 0);
+SELECT pg_temp.check('... and lists each category at most once, within the number of categories',
+    :rows_with_loop = :distinct_categories_with_loop + :uncategorised_rows
+    AND :uncategorised_rows = 1
+    AND :rows_with_loop <= (SELECT count(*) FROM categories) + 1);
 SELECT count(*) AS products_with_loop FROM low_stock_products \gset
-SELECT pg_temp.check('drill-down still returns with a loop in the tree',
-    :products_with_loop > 0);
+SELECT pg_temp.check('drill-down still returns, listing every low or out-of-stock product exactly once',
+    :products_with_loop = (SELECT count(*) FROM products WHERE stock_quantity <= reorder_level));
 
 ROLLBACK;
 

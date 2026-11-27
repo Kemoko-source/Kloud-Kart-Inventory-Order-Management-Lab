@@ -10,17 +10,7 @@
 
 BEGIN;
 
-CREATE FUNCTION pg_temp.check(test_name text, condition boolean)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF condition IS NOT TRUE THEN
-        RAISE EXCEPTION 'FAIL  %', test_name;
-    END IF;
-    RAISE NOTICE 'ok    %', test_name;
-END
-$$;
+\ir test_helpers.sql
 
 -- Stock counter equals the sum of the product's movements.
 CREATE FUNCTION pg_temp.ledger_matches(p_product_id bigint)
@@ -32,6 +22,8 @@ AS $$
 $$;
 
 SELECT min(customer_id) AS cid FROM customers \gset
+SELECT pg_temp.check('setup: a customer exists to place orders for (load the data first)',
+    :'cid' <> '');
 
 -- Seed the product through a restock movement so the ledger starts level.
 INSERT INTO products (product_name, price, stock_quantity)
@@ -97,6 +89,8 @@ SELECT pg_temp.check('... but returns no stock, because it never took any',
 INSERT INTO products (product_name, price, stock_quantity)
 VALUES ('CANCEL TEST PRODUCT B', 10, 8)
 RETURNING product_id AS pid_b \gset
+-- Give product B a history whose movements net to its stock of 8 (10 in, 2 sold
+-- to someone else), so its ledger starts level like a real product's.
 INSERT INTO inventory_log (product_id, change_qty, reason) VALUES (:pid_b, 10, 'restock'), (:pid_b, -2, 'sale');
 
 INSERT INTO orders (customer_id, status, total_amount) VALUES (:cid, 'pending', 80)

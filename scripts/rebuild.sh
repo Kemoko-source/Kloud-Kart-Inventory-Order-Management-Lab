@@ -10,7 +10,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+source scripts/lib.sh
+load_env
 
 # Start the database if needed and wait for its health check: right after
 # `docker compose up -d`, PostgreSQL is still initialising and refuses

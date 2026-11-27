@@ -105,10 +105,69 @@ BEGIN
     END IF;
     RAISE NOTICE 'ok    every product: stock counter = sum of ledger';
 
-    IF (SELECT count(*) FROM data_quarantine) = 0 OR (SELECT count(*) FROM data_corrections) = 0 THEN
-        RAISE EXCEPTION 'FAIL  audit tables are empty: clean-up left no trail';
+END
+$$;
+
+-- The audit tables reconcile to the totals stated in data_findings.md
+-- (Reconciliation section), reason by reason. These figures belong to the
+-- provided extract: a different extract is expected to fail here.
+DO $$
+DECLARE
+    mismatch text;
+BEGIN
+    WITH expected (source_table, reason_code, rows_expected) AS (VALUES
+        ('orders',        'orphan_customer',       210),
+        ('orders',        'date_after_extract',     24),
+        ('order_items',   'orphan_order',          692),
+        ('order_items',   'orphan_customer',       470),
+        ('order_items',   'date_after_extract',     48),
+        ('order_items',   'duplicate_line',        527),
+        ('order_items',   'implausible_quantity',    1),
+        ('inventory_log', 'orphan_product',        120)
+    ), actual AS (
+        SELECT source_table, reason_code, count(*) AS rows_actual
+        FROM data_quarantine GROUP BY source_table, reason_code
+    )
+    SELECT string_agg(format('%s/%s expected %s, found %s', coalesce(e.source_table, a.source_table),
+                             coalesce(e.reason_code, a.reason_code),
+                             coalesce(e.rows_expected, 0), coalesce(a.rows_actual, 0)), '; ')
+    INTO mismatch
+    FROM expected e
+    FULL JOIN actual a USING (source_table, reason_code)
+    WHERE e.rows_expected IS DISTINCT FROM a.rows_actual;
+    IF mismatch IS NOT NULL THEN
+        RAISE EXCEPTION 'FAIL  quarantine does not reconcile: %', mismatch;
     END IF;
-    RAISE NOTICE 'ok    every removal and correction is recorded';
+    RAISE NOTICE 'ok    quarantine reconciles: 2,092 rows, reason by reason';
+
+    WITH expected (reason_code, rows_expected) AS (VALUES
+        ('status_spelling',         116394),
+        ('contact_format',           35570),
+        ('implausible_quantity',         5),
+        ('stock_ledger_drift',         144),
+        ('oversold_negative_stock',     14),
+        ('category_cycle',               1),
+        ('category_missing_parent',      1)
+    ), actual AS (
+        SELECT reason_code, sum(rows_affected) AS rows_actual FROM data_corrections GROUP BY reason_code
+    )
+    SELECT string_agg(format('%s expected %s, found %s', coalesce(e.reason_code, a.reason_code),
+                             coalesce(e.rows_expected, 0), coalesce(a.rows_actual, 0)), '; ')
+    INTO mismatch
+    FROM expected e
+    FULL JOIN actual a USING (reason_code)
+    WHERE e.rows_expected IS DISTINCT FROM a.rows_actual;
+    IF mismatch IS NOT NULL THEN
+        RAISE EXCEPTION 'FAIL  corrections do not reconcile: %', mismatch;
+    END IF;
+    RAISE NOTICE 'ok    corrections reconcile: every changed value accounted for, reason by reason';
+
+    IF (SELECT count(*) FROM inventory_log
+        WHERE reason = 'correction'
+          AND (note LIKE 'Migration reconciliation:%' OR note LIKE 'Oversold before migration:%')) <> 144 + 14 THEN
+        RAISE EXCEPTION 'FAIL  expected 158 clean-up movements in inventory_log (144 reconciliations + 14 oversold)';
+    END IF;
+    RAISE NOTICE 'ok    the 158 movements the clean-up added are in the ledger';
 END
 $$;
 

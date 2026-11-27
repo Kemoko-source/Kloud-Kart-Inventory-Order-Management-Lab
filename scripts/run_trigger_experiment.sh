@@ -9,7 +9,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+source scripts/lib.sh
+load_env
 
 experiment_db="${POSTGRES_DB}_trigger_experiment"
 evidence_dir="evidence"

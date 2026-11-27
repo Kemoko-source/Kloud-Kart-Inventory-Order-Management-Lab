@@ -11,24 +11,15 @@
 
 BEGIN;
 
--- A function, not a procedure: CALL arguments may not contain subqueries.
-CREATE FUNCTION pg_temp.check(test_name text, condition boolean)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF condition IS NOT TRUE THEN
-        RAISE EXCEPTION 'FAIL  %', test_name;
-    END IF;
-    RAISE NOTICE 'ok    %', test_name;
-END
-$$;
+\ir test_helpers.sql
 
 INSERT INTO products (product_name, price, stock_quantity)
 VALUES ('PLACE ORDER TEST PRODUCT', 25.50, 3)
 RETURNING product_id AS pid \gset
 
 SELECT min(customer_id) AS cid FROM customers \gset
+SELECT pg_temp.check('setup: a customer exists to place orders for (load the data first)',
+    :'cid' <> '');
 
 -- A successful order writes order, line and movement, all linked.
 SELECT success, order_id AS oid, message FROM place_order(:cid, :pid, 2) \gset
@@ -95,12 +86,22 @@ SELECT pg_temp.check('deleted movement is archived with who and when',
     (SELECT count(*) = 1 FROM inventory_log_deleted
      WHERE log_id = :last_log AND deleted_by = current_user AND row_data ->> 'reason' = 'sale'));
 
--- Historical sales were linked to their orders.
+-- Historical sales were linked to their orders. Assumption, stated: the
+-- extract has no order_id on movements, so a historical sale is identified by
+-- product + timestamp (it was written at its order's order_date). 40_audit_
+-- trail.sql checked this rule is unambiguous: 261,574 sales match exactly one
+-- order each, none match two. The two checks below test it in both directions.
 SELECT pg_temp.check('every historical sale of a live order is linked to it',
     NOT EXISTS (SELECT 1 FROM inventory_log l
                 JOIN order_items i ON i.product_id = l.product_id
                 JOIN orders o ON o.order_id = i.order_id AND o.order_date = l.created_at
                 WHERE l.reason = 'sale' AND l.order_id IS NULL));
+SELECT pg_temp.check('every linked sale points at an order that contains that product at that time',
+    0 = (SELECT count(*) FROM inventory_log l
+         WHERE l.reason = 'sale' AND l.order_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM orders o JOIN order_items i USING (order_id)
+                           WHERE o.order_id = l.order_id AND i.product_id = l.product_id
+                             AND o.order_date = l.created_at)));
 
 ROLLBACK;
 

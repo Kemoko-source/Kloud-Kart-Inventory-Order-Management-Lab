@@ -9,11 +9,14 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+source scripts/lib.sh
+load_env
 
 for test_file in tests/*_test.sql; do
     echo "== ${test_file}"
     # A bad query plan must fail the test, not hang it: one once ran for 8 hours.
+    # The pipe into sed does not hide a failure: with `set -o pipefail` (above),
+    # a failing psql makes the whole pipeline fail, and `set -e` stops the run.
     docker compose exec -T -e PGOPTIONS='-c statement_timeout=120s' db \
         psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f "/workspace/${test_file}" 2>&1 \
         | sed 's/^psql:[^ ]* NOTICE:  //'

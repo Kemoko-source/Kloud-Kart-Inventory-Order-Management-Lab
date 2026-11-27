@@ -2,7 +2,7 @@
 # Credentials come from .env (copy .env.example); nothing secret lives here.
 services:
   db:
-    image: postgres:18              # the version the module is graded against
+    image: postgres:18.7            # PostgreSQL 18, the version the module is graded against, pinned to the release tested
     container_name: kloudkart-db
     # race_test.py opens 400 connections at once; the default of 100 makes
     # Test 2 hang at its barrier and look like a broken place_order().

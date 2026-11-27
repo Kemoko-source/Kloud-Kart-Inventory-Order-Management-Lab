@@ -18,7 +18,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 cd "$(dirname "$0")/.."
-set -a; source .env; set +a
+source scripts/lib.sh
+load_env
 
 out="evidence/measurements.txt"
 warm_runs=10

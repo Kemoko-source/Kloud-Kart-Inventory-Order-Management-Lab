@@ -30,6 +30,13 @@ infrastructure:
 
 You do not need `psql` or Python on the host: both run inside containers.
 
+**Git Bash on Windows:** commands below that pass a path *inside* a container
+(starting `/workspace/`, `/tests/` or `/benchmarks/`) need `MSYS_NO_PATHCONV=1`
+in front, or Git Bash rewrites the path into a Windows one and the file is "not
+found". For example:
+`MSYS_NO_PATHCONV=1 docker compose exec -T db psql -f /workspace/diagnosis/diagnosis_checks.sql`.
+The scripts in `scripts/` set it themselves, and PowerShell is not affected.
+
 ## Setup
 
 ```bash
@@ -96,8 +103,9 @@ SELECT * FROM cancel_order(p_order_id => 1000123, p_note => 'customer changed th
 **The Monday report**
 
 ```sql
--- Top 100, as of a given Monday (defaults to today)
-SELECT spend_rank, full_name, email, total_spent, order_count, spend_last_12_months, monthly_spend
+-- Top 100, as of a given Monday (defaults to today). The function also returns
+-- each customer's email; leave it out of anything shared beyond the team.
+SELECT spend_rank, customer_id, full_name, total_spent, order_count, spend_last_12_months, monthly_spend
 FROM monday_customer_report('2026-09-07')
 WHERE spend_rank <= 100
 ORDER BY spend_rank;
@@ -139,12 +147,37 @@ SELECT product_id, product_name, stock_quantity, reasons FROM products_to_recoun
 - `tests/cancel_race_test.py`: simultaneous cancellations, cancelling during a flash sale, no deadlocks
 
 Each SQL test has a 2-minute statement timeout, so a bad query plan fails
-instead of hanging. To run the provided concurrency test on its own:
+instead of hanging. The SQL tests share one helper, `tests/test_helpers.sql`.
+Test fixtures are named after the test that creates them, and any email
+address uses the reserved `.invalid` domain, so no fixture can reach a real
+customer.
+
+To run the provided concurrency test on its own:
 
 ```bash
 docker compose run --rm racetest              # all four tests
 docker compose run --rm racetest --test 2     # flash sale only
 ```
+
+The container gets `DATABASE_URL` from `.env` automatically. To run
+`race_test.py` or `tests/cancel_race_test.py` directly with Python on the host
+instead (needs `pip install psycopg2-binary`), set it first:
+
+```bash
+# bash / Git Bash
+export DATABASE_URL="postgresql://kloudkart:$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2)@localhost:5432/kloudkart"
+```
+
+```powershell
+# PowerShell
+$pw = (Select-String -Path .env -Pattern '^POSTGRES_PASSWORD=(.*)$').Matches[0].Groups[1].Value
+$env:DATABASE_URL = "postgresql://kloudkart:$pw@localhost:5432/kloudkart"
+```
+
+Then `python M03_Resources/race_test.py`. These read the password from `.env`
+without displaying it; the variable lasts only for that terminal. If you
+changed `POSTGRES_USER`, `POSTGRES_DB` or `POSTGRES_PORT` in `.env`, adjust the
+URL to match.
 
 ## Measurements, benchmarks and the triggers experiment
 

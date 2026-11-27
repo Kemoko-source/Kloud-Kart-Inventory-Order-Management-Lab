@@ -10,23 +10,17 @@
 \set QUIET on
 \o /dev/null
 
+-- Fixed dates, deliberately. The extract's trading ends on 2026-08-31, and the
+-- report defaults to today's date; pinning "as of" to the first Monday after
+-- the extract keeps every expected figure stable however old the data gets.
+-- These three must move together: window = the 12 months before as_of's month.
 \set as_of        '2026-09-07'
 \set window_start '2025-09-01'
 \set window_end   '2026-09-01'
 
 BEGIN;
 
-CREATE FUNCTION pg_temp.check(test_name text, condition boolean)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF condition IS NOT TRUE THEN
-        RAISE EXCEPTION 'FAIL  %', test_name;
-    END IF;
-    RAISE NOTICE 'ok    %', test_name;
-END
-$$;
+\ir test_helpers.sql
 
 -- Snapshot the report and its monthly detail once; the checks read the
 -- snapshots. Autovacuum never analyzes temp tables, and without statistics the
@@ -76,8 +70,14 @@ SELECT pg_temp.check('rank 1 is the biggest spender and ranks follow spend',
         FROM report) x)
     AND (SELECT total_spent FROM report WHERE spend_rank = 1 LIMIT 1) = (SELECT max(total_spent) FROM report));
 
-SELECT pg_temp.check('top-100 filter returns at least 100 customers (ties share a rank)',
-    (SELECT count(*) >= 100 FROM report WHERE spend_rank <= 100));
+-- The top 100 is exactly the customers who spent at least as much as the
+-- 100th-highest spender (more than 100 rows only if there is a tie at 100).
+SELECT spend AS spend_100th
+FROM (SELECT total_spent AS spend FROM report ORDER BY total_spent DESC OFFSET 99 LIMIT 1) x \gset
+SELECT pg_temp.check('top 100 = everyone spending at least the 100th-highest amount, no one else',
+    (SELECT count(*) FROM report WHERE spend_rank <= 100)
+        = (SELECT count(*) FROM report WHERE total_spent >= :spend_100th)
+    AND NOT EXISTS (SELECT 1 FROM report WHERE spend_rank <= 100 AND total_spent < :spend_100th));
 
 SELECT pg_temp.check('summary agrees with the monthly detail',
     0 = (
@@ -91,6 +91,7 @@ SELECT pg_temp.check('people with two accounts are flagged',
      WHERE email IN (SELECT email FROM customers GROUP BY email HAVING count(*) > 1)));
 
 -- Definitions at the boundaries, on a brand-new customer with no history.
+-- .invalid is a reserved domain: a fixture address can never reach a real inbox.
 INSERT INTO customers (full_name, email) VALUES ('Report Test Customer', 'report.test@example.invalid')
 RETURNING customer_id AS cid \gset
 
