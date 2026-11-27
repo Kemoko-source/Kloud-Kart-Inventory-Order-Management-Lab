@@ -9,7 +9,7 @@ Sections are added milestone by milestone:
 1. [Cleaning and hardening](#1-cleaning-and-hardening) (`sql/10`–`30`)
 2. [Overselling and the audit trail](#2-overselling-and-the-audit-trail) (`sql/40`–`50`)
 3. [Low-stock rollup](#3-low-stock-rollup) (`sql/60`)
-4. Monday report: *to follow*
+4. [Monday report](#4-monday-report) (`sql/70`)
 
 ---
 
@@ -347,3 +347,111 @@ after its rollback. The general lesson for Kloud Kart's team: stale statistics
 can make a fast query slow without any change to the query; autovacuum keeps
 them fresh in normal operation. Worst case, the JIT cost adds about 0.6 s, which
 is still inside the "couple of seconds" budget.
+
+---
+
+## 4. Monday report
+
+### 4.1 Definitions the brief leaves open
+
+| Question | Decision | Why | Cost if wrong |
+|---|---|---|---|
+| What counts as "spent"? | `completed` and `shipped` orders | Cancelled and refunded orders are money returned. **Pending orders are excluded too**: they average 110 days old, the same as completed ones (diagnosis #14), so "pending" means stuck, not about to ship. | Pending orders are 9.9% of order value (GHS 48M). If they were in fact paid, every customer's spend is understated by about that much. One word in the function changes it. |
+| What is "trailing 12 months"? | The 12 **complete** calendar months before the month of the report date. Run on Monday 7 September 2026: September 2025 to August 2026. The date is a parameter that defaults to today. | A partial current month would make the latest column look like a collapse every week. | None to the totals; only which month is shown last. |
+| A running total of what? | Each customer's **cumulative spend at the end of each month**, including everything before the window | This is the figure Adwoa keeps by hand; the last value equals the customer's total spent. | Low: if she tracks something else, the monthly detail function has all the parts. |
+| How are ties ranked? | `RANK()`: equal spenders share a rank, so "top 100" can return a few more than 100 rows | Choosing who drops out of a tie would be arbitrary. | None. |
+| What is a "customer"? | An **account**. The 533 people with two or three accounts are flagged (`accounts_sharing_email`), not merged | Merging is irreversible, and the accounts carry different phone numbers (diagnosis #9). | Such a person's spend is split across rows, so they can rank lower than they should. The flag makes them visible. |
+
+### 4.2 Shape: two functions sharing one definition
+
+| Function | Returns |
+|---|---|
+| `customer_monthly_spend(as_of)` | One row per customer per month: orders, spend, running orders, running total. The detail behind the report. |
+| `monday_customer_report(as_of)` | One row per customer: rank, total spent, order count, last-12-month spend, the 12 monthly spends and 12 running totals as arrays, and the duplicate-account flag. **Built from the detail function**, so the summary and the detail can never disagree. |
+
+The top 100 is `WHERE spend_rank <= 100` on the second function, not a third
+query with its own definitions.
+
+### 4.3 Performance: measured before and after
+
+`scripts/run_report_benchmark.sh` loads the extract **exactly as delivered**
+into a separate database and times each version. Output:
+[`docs/evidence/report_benchmark.txt`](evidence/report_benchmark.txt).
+
+| Version | All 40,420 customers |
+|---|---|
+| **Before:** raw extract, report written as sub-queries per customer and per month (26 scans of `orders` per customer) | **≈ 3 hours** (2.9–3.1 h across runs), extrapolated from a measured 20-customer sample at 260–278 ms per customer |
+| Indexes only: the same sub-queries on the indexed database | 7.5–7.6 s |
+| Rewrite only: the set-based query on the raw extract, **no indexes** | 1.1–1.5 s |
+| **After:** `monday_customer_report()`, every column for every customer | **1.5–2.0 s** |
+| After, at about 10× volume: 1.6M orders and 100,420 customers (`benchmarks/report_at_scale.sql`) | **5.1–5.7 s** |
+
+**What made it fast.** The report reads `orders` once, groups it, and lets window
+functions produce the running totals and the ranking. The naive version
+re-reads the table 26 times per customer.
+
+**Why not just indexes.** An index on `orders.customer_id` makes each of the
+naive version's lookups fast, and today that alone gets it to 7.6 s. But it
+still issues about a million lookups per run (26 for each of 40,420
+customers), and that number grows with every new customer. The set-based
+version's cost follows the number of orders, not customers × months.
+
+**Why not a bigger server.** Both fixes are about how much work the query does,
+not how fast the hardware does it. The rewrite alone took the raw extract from
+hours to about a second on a laptop. Direct evidence: giving the query more
+memory (`work_mem` 32 MB or 64 MB instead of 4 MB) made it **slower** at 10×
+volume (6.3–11.6 s against 5.3–5.7 s), because the planner switched to plans
+that suit the bigger budget worse.
+
+**Three plan problems found and fixed with `EXPLAIN ANALYZE`:**
+
+1. **The function wrapper doubled the cost.** A `SET search_path` clause stops
+   PostgreSQL from inlining a SQL function, so 485,040 detail rows were stored
+   and read back. The clause was removed and every table is schema-qualified
+   (`public.orders`) instead, which keeps the protection against look-alike
+   tables.
+2. **The month list was mis-estimated by 80×.** `generate_series` over dates is
+   always estimated at 1,000 rows, which inflated the plan to 40 million rows.
+   An integer series (`0..11`) is estimated exactly.
+3. **One join re-read 9.3 million rows to produce 1.2 million (at 10× volume).**
+   Joining on a computed month date let PostgreSQL merge on the customer only.
+   An integer month index gives the join two plain keys. This cut the 10×
+   run from 7.2 s to 5.6 s.
+
+**Tested and left alone.** JIT compilation costs about 0.57 s on this query and
+gains about as much back; with it on or off, the results were within
+run-to-run noise. Server settings were not changed: no measurable gain, and
+one more thing for Kloud Kart's team to maintain.
+
+**What survives growth, and what does not.** At the brief's 4,000 orders a day,
+a year is about 1.5M orders, close to the 10× test: about 5.5 s. Cost grows
+roughly in line with orders and customers. At several times that volume, the
+next step is a monthly spend table kept up to date as orders are placed, so
+the report reads 12 small rows per customer instead of every order. It is not
+built now because it adds a write on every order to save seconds nobody is
+waiting for yet.
+
+### 4.4 Correctness
+
+`tests/monday_report_test.sql` (13 checks, rolled back) compares every
+customer's total and order count with a direct count, checks that the 12
+months add up and the running totals step correctly, checks that ranks follow
+spend and that the summary agrees with the detail, and then tests each
+definition at its boundary on a new customer: pending, cancelled and refunded
+orders excluded, an order before the window counted in the total only, window
+start inclusive and window end exclusive.
+
+**A test that ran for 8 hours.** One check was written as `NOT EXISTS (join of
+two 40k-row tables)`. Inside `EXISTS`, PostgreSQL plans to stop at the first
+match and picked a nested loop. When nothing differs, as here, that compares
+all 1.6 billion pairs. Rewritten as `count(*) = 0`, it takes milliseconds.
+Every SQL test now runs with a 2-minute statement timeout, so a bad plan fails
+the test instead of hanging it.
+
+### 4.5 What the report cannot fix
+
+All 100 of the top-100 customers bought at least one of the 116 products with
+suspect prices (diagnosis #13), and those products make up 44% of the spend
+the report counts. The report is arithmetically correct, but **its ranking is
+only as trustworthy as the price list.** This is stated in the memo as
+something to verify before the ranking is used for decisions.

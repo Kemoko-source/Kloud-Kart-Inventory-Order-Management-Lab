@@ -69,6 +69,26 @@ reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
 | `sql/40_audit_trail.sql` | Links each sale movement to its order; makes `inventory_log` append-only and archives any deletion |
 | `sql/50_place_order.sql` | `place_order()`: atomic, oversell-proof order placement with a clean "out of stock" |
 | `sql/60_low_stock.sql` | Per-product `reorder_level`; views `category_tree`, `low_stock_by_category` (rollup at any depth) and `low_stock_products` (drill-down) |
+| `sql/70_monday_report.sql` | `monday_customer_report()` and the monthly detail behind it, `customer_monthly_spend()` |
+
+## Running the Monday report
+
+```sql
+-- Top 100, as of a given Monday (defaults to today)
+SELECT spend_rank, full_name, email, total_spent, order_count, spend_last_12_months, monthly_spend
+FROM monday_customer_report('2026-09-07')
+WHERE spend_rank <= 100
+ORDER BY spend_rank;
+
+-- One customer's month-by-month spend and running total
+SELECT month, orders, spend, running_total
+FROM customer_monthly_spend('2026-09-07')
+WHERE customer_id = 116661
+ORDER BY month;
+```
+
+`monthly_spend[1]` is the oldest of the 12 months (`window_start`) and
+`monthly_spend[12]` the most recent.
 
 ## Using the low-stock views
 
@@ -92,6 +112,7 @@ This runs:
 - `tests/constraints_test.sql`: the schema refuses each diagnosed problem
 - `tests/place_order_test.sql`: refusals, linked writes, append-only ledger
 - `tests/low_stock_test.sql`: rollup arithmetic at every node, any depth, still answers with a loop in the tree
+- `tests/monday_report_test.sql`: report totals against a direct count, and each definition at its boundary
 - `race_test.py`, unmodified: concurrency under contention
 
 The SQL tests run in rolled-back transactions and leave no trace.
@@ -108,6 +129,12 @@ docker compose run --rm racetest --test 2     # flash sale only
 ```bash
 # Low-stock rollup on a synthetic tree 50x today's size (rolled back afterwards)
 docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/low_stock_at_scale.sql
+
+# Monday report: raw extract + naive query vs final (writes docs/evidence/report_benchmark.txt)
+./scripts/run_report_benchmark.sh
+
+# Monday report at about 10x today's order volume (rolled back afterwards)
+docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/report_at_scale.sql
 ```
 
 ## Experiment: would triggers alone have fixed overselling?

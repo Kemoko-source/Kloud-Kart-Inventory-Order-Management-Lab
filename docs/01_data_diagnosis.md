@@ -40,6 +40,18 @@ cleared them.
 | 11 | Low | **Contact data in mixed formats.** Emails with surrounding spaces; phones in four formats (`+233…`, `233…`, `0…`, spaced); city spelled `Accra`, `accra`, `ACCRA`, `Accra `. | 1,314 padded emails (all fail a basic email pattern as stored); ~8,000 phones per format; 15 city spellings for 12 cities. | D11 | Emails and SMS bounce; "orders by city" splits Accra four ways. No effect on Nana's four asks. |
 | 12 | Low | **Name capitalisation** (`YAA MENSAH`, `kwesi danso`, padded). | About 5,100 customers. | Profiling | Cosmetic only. Not worth changing data the business did not ask about. |
 
+### Found later, while building the Monday report
+
+These two surfaced when the report's top-ranked customers were checked by
+hand. They are numbered on from the table above rather than re-ranked into
+it, so references to findings #1–#12 elsewhere stay valid. By danger, #13
+belongs beside #1 and #2.
+
+| # | Danger | Problem | Size | How it was detected | What it costs Nana if left |
+|---|---|---|---|---|---|
+| 13 | **High, unverified** | **Everyday goods priced like appliances.** 116 products cost 50 to 235 times the median price of their own category: cooking oil, kids' clothing, irons, fans, soft drinks and a USB-C cable at GHS 16,000–22,000. On a log-scale price histogram they form a separate cluster above the normal range, which is the signature of a unit error (pesewas entered as cedis) rather than of premium products. Customers were charged these amounts, and the orders completed. | 116 products; GHS 214M, **43.6% of all line value**. After cleaning, GHS 166M of the GHS 380M counted as spent (44%), and **all 100 of the report's top-100 customers bought at least one of them**. | D12: each product's price against its category median; price histogram on a log scale; top-100 customers cross-checked | If the prices are wrong, revenue is overstated by up to 44%, the top-100 ranking measures who bought mispriced items rather than who the best customers are, and customers may have been overcharged. **Not changed**: only Kloud Kart's price list can say which prices are real (see the memo). |
+| 14 | Medium | **"Pending" orders are stuck, not in progress.** Pending orders average 110 days old, exactly like completed ones, and the oldest date from the first week of the extract. | 16,007 orders, GHS 48.5M | D13: average age of orders by status | Either money was taken for orders that were never fulfilled, or orders were abandoned and never closed. Either way, GHS 48.5M sits in a status nobody acts on. The report excludes pending orders from "spent" (decisions §4.1). |
+
 ### Structural problems underneath all of the above
 
 | Problem | Evidence | Why it matters |

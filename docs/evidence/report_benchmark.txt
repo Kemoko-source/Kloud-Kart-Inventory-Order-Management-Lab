@@ -1,0 +1,22 @@
+Monday report benchmark, 2026-11-27 07:15 UTC
+PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5), report as of 2026-09-07, 40420 customers
+Docker VM: 8 CPUs, 16653119488 bytes RAM
+
+== Loading the raw extract into kloudkart_raw
+
+== BEFORE: raw extract, naive per-customer sub-queries (20-customer sample)
+   5553 ms for 20 customers = 278 ms per customer
+   extrapolated to 40420 customers: 11222 s (3.1 hours)
+
+== Rewrite only: raw extract, set-based query, no indexes (3 runs, all customers)
+   1219 ms
+   1102 ms
+   1066 ms
+
+== Indexes only: cleaned and indexed database, naive sub-queries (all customers)
+   7539 ms
+
+== AFTER: cleaned and indexed database, monday_customer_report() (3 runs, all customers, all columns)
+   1875 ms
+   1954 ms
+   1471 ms

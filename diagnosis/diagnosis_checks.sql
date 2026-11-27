@@ -195,6 +195,33 @@ SELECT count(*) FILTER (WHERE email <> trim(email)) AS padded_emails,
        count(DISTINCT initcap(trim(city)))            AS real_cities
 FROM customers;
 
+\echo '== D12 Products priced 50x or more above their category median (unverified pricing error)'
+-- Found while building the Monday report: the top-ranked customers all bought
+-- everyday goods (oil, kids clothing, fans) priced at GHS 16,000-22,000.
+WITH category_median AS (
+    SELECT category_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price
+    FROM products
+    GROUP BY category_id
+), suspect AS (
+    SELECT p.product_id
+    FROM products p
+    JOIN category_median m USING (category_id)
+    WHERE p.price >= 50 * m.median_price
+)
+SELECT (SELECT count(*) FROM suspect) AS suspect_products,
+       round(sum(i.quantity * i.unit_price) FILTER (WHERE i.product_id IN (SELECT product_id FROM suspect))) AS suspect_line_value,
+       round(100.0 * sum(i.quantity * i.unit_price) FILTER (WHERE i.product_id IN (SELECT product_id FROM suspect))
+                   / sum(i.quantity * i.unit_price), 1) AS pct_of_all_line_value
+FROM order_items i;
+
+\echo '== D13 "Pending" orders are as old as completed ones: stuck, not in progress'
+SELECT lower(trim(status)) AS status, count(*) AS orders, round(sum(total_amount)) AS ghs_value,
+       round(avg(extract(epoch FROM (timestamp '2026-08-31 23:59:59' - order_date)) / 86400)) AS avg_age_days
+FROM orders
+WHERE order_date <= '2026-08-31 23:59:59'
+GROUP BY 1
+ORDER BY orders DESC;
+
 \echo '== N1 NOT a problem: order-line price differs from today''s product price (price at time of sale)'
 SELECT CASE WHEN i.unit_price = 0 THEN 'zero'
             WHEN i.unit_price < 0.9 * p.price THEN 'below current price'
