@@ -10,6 +10,7 @@ Sections are added milestone by milestone:
 2. [Overselling and the audit trail](#2-overselling-and-the-audit-trail) (`sql/40`–`50`)
 3. [Low-stock rollup](#3-low-stock-rollup) (`sql/60`)
 4. [Monday report](#4-monday-report) (`sql/70`)
+5. [Improvement beyond the brief: cancellations return stock](#5-improvement-beyond-the-brief-cancellations-return-stock) (`sql/80`)
 
 ---
 
@@ -232,11 +233,11 @@ Historically stock moved when an order shipped (diagnosis N5), which left the
 oversell window open between payment and shipping. New orders take stock at
 checkout and start as `pending`.
 
-**Consequence.** A cancelled order must return its stock. `place_order` does not
-cancel orders, so the cancellation path in the application needs a matching
-`correction` movement. This is flagged in the memo. **Assumption:** pending
-historical orders (placed before this change) did not reserve stock, so they
-are not re-reserved retroactively.
+**Consequence.** A cancelled order must return its stock, or every
+cancellation leaves units permanently off the shelf. This is what
+`cancel_order()` does (section 5). **Assumption:** historical pending orders
+(placed before this change) did not reserve stock, so they are not
+re-reserved retroactively, and cancelling one returns nothing.
 
 ### 2.7 The audit trail
 
@@ -455,3 +456,78 @@ suspect prices (diagnosis #13), and those products make up 44% of the spend
 the report counts. The report is arithmetically correct, but **its ranking is
 only as trustworthy as the price list.** This is stated in the memo as
 something to verify before the ranking is used for decisions.
+
+---
+
+## 5. Improvement beyond the brief: cancellations return stock
+
+### 5.1 Why this one
+
+The brief asks for one improvement, justified by what it is worth to Nana or
+Adwoa. Three candidates came out of the work:
+
+| Candidate | Worth | Chosen? |
+|---|---|---|
+| **`cancel_order()`: a cancelled order gives its stock back, with an audit movement** | Keeps Nana's stock figures true after go-live. Closes a gap this solution itself opened. | **Yes** |
+| A price-anomaly watch: products priced far outside their category, and the report spend that depends on them | Protects Adwoa's ranking (diagnosis #13) | Recommended in the memo |
+| A stuck-orders list: pending orders older than N days, with value and customer | An action list for GHS 48M (diagnosis #14) | Recommended in the memo |
+
+**Why it matters most.** `place_order()` now takes stock at checkout (decision
+2.6). Without a cancellation path, every cancelled order would keep its units
+off the shelf for ever. Each cancellation would leave one more product showing
+less stock than is really there, and within weeks Nana's figures would drift
+back to the state he started with: counts nobody trusts. The two watch lists
+report problems; this prevents one, and it protects Nana's first priority.
+
+### 5.2 Key decision: return what the ledger says, not what the order says
+
+`cancel_order()` returns, per product, the stock **the order's own movements in
+`inventory_log` show it still holds**, not its line quantities.
+
+| | Returns line quantities | Returns what the ledger shows (chosen) |
+|---|---|---|
+| New order from `place_order` | 3 units back | 3 units back |
+| **Historical pending order** (stock was never taken: it used to move at shipping) | **Invents stock.** Across the 15,983 such orders: up to **53,223 phantom units** | Nothing back, because nothing was taken |
+| Same order cancelled twice | Twice the stock, unless something else stops it | Nothing the second time: the ledger already shows it returned |
+
+This is only possible because every movement now carries its `order_id`
+(decision 2.7). The audit trail is what makes the cancellation correct.
+
+### 5.3 The rest of the design
+
+| Decision | Why |
+|---|---|
+| Only `pending` orders can be cancelled | Shipped goods have left the warehouse; taking them back is a return, a different process with a different movement reason. |
+| Status change is one conditional `UPDATE … WHERE status = 'pending'` | Same pattern as `place_order`: of several simultaneous cancellations, exactly one changes the row. The others get "already cancelled". |
+| New movement reason `cancellation` (must add stock) | An auditor can tell an order that never left the warehouse from goods a customer handed back (`return`). The sign rule from 1.4 is extended, not bypassed. |
+| Products locked in `product_id` order before stock is returned | Two cancellations sharing products always lock them in the same order, so they cannot deadlock. |
+| Clear refusals: unknown order, already cancelled, not pending | Same contract style as `place_order`: `success = false` with a reason, never a crash. |
+
+### 5.4 Evidence
+
+- `tests/cancel_order_test.sql` (15 checks): stock and ledger back level after a
+  cancellation; a cancellation movement linked to the order; a second
+  cancellation refused; shipped and unknown orders refused; a historical
+  pending order cancelled with **no** stock returned; a two-product order getting
+  every unit back; a negative `cancellation` movement rejected.
+- `tests/cancel_race_test.py` (same style as `race_test.py`): 10 simultaneous
+  cancellations of one order, 25 rounds, exactly one succeeds each time; every
+  flash-sale winner cancels while 100 new buyers race for the returned units,
+  with no errors, no negative stock, and counter = ledger = 50 minus units still
+  on order; 40 two-product orders with their lines in opposite orders, all
+  cancelled at once, with no deadlock.
+- **The test was checked against a deliberately broken version.** With the
+  `status = 'pending'` guard removed, it failed all 25 rounds of the
+  double-cancel test (10 "successes" each). It also showed something useful: even
+  with the guard gone, **no stock was returned twice**, because the ledger had
+  nothing left to give back. The design has two independent layers: the status
+  guard gives callers the right answer, and the ledger keeps the stock right
+  even if that guard is ever broken.
+
+### 5.5 What it does not do
+
+- It does not handle returns of delivered goods (a `return` movement after
+  `shipped`/`completed`). That needs a business rule on refunds and the
+  condition of returned goods that only Nana can set.
+- It cancels whole orders. Removing one line from a multi-line order would need
+  its own function on the same ledger principle.

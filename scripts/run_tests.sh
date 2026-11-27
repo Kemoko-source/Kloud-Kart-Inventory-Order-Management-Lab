@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs every test against the current database: the SQL test files (each in a
-# rolled-back transaction) and then the unmodified race_test.py.
+# rolled-back transaction), the unmodified race_test.py, and our own
+# cancellation concurrency test.
 #
 # Usage (from the repo root, after ./scripts/rebuild.sh):
 #     ./scripts/run_tests.sh
@@ -20,3 +21,6 @@ done
 
 echo "== race_test.py (unmodified)"
 docker compose run --rm -T racetest
+
+echo "== tests/cancel_race_test.py"
+docker compose run --rm -T --entrypoint python racetest /tests/cancel_race_test.py

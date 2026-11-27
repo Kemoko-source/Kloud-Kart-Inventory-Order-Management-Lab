@@ -70,6 +70,20 @@ reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
 | `sql/50_place_order.sql` | `place_order()`: atomic, oversell-proof order placement with a clean "out of stock" |
 | `sql/60_low_stock.sql` | Per-product `reorder_level`; views `category_tree`, `low_stock_by_category` (rollup at any depth) and `low_stock_products` (drill-down) |
 | `sql/70_monday_report.sql` | `monday_customer_report()` and the monthly detail behind it, `customer_monthly_spend()` |
+| `sql/80_cancel_order.sql` | Improvement beyond the brief: `cancel_order()` returns exactly the stock a pending order took, with a `cancellation` movement |
+
+## Placing and cancelling orders
+
+```sql
+-- Sample output; your order_id will differ.
+SELECT * FROM place_order(p_customer_id => 100001, p_product_id => 5001, p_quantity => 2);
+--  success | order_id | message
+--  t       |  1000123 | Order 1000123 placed: 2 unit(s)
+
+SELECT * FROM cancel_order(p_order_id => 1000123, p_note => 'customer changed their mind');
+--  success | units_returned | message
+--  t       |              2 | Order 1000123 cancelled; 2 unit(s) returned to stock
+```
 
 ## Running the Monday report
 
@@ -113,7 +127,9 @@ This runs:
 - `tests/place_order_test.sql`: refusals, linked writes, append-only ledger
 - `tests/low_stock_test.sql`: rollup arithmetic at every node, any depth, still answers with a loop in the tree
 - `tests/monday_report_test.sql`: report totals against a direct count, and each definition at its boundary
+- `tests/cancel_order_test.sql`: cancellations return exactly the ledger's stock, refusals, multi-product orders
 - `race_test.py`, unmodified: concurrency under contention
+- `tests/cancel_race_test.py`: simultaneous cancellations, cancelling during a flash sale, no deadlocks
 
 The SQL tests run in rolled-back transactions and leave no trace.
 

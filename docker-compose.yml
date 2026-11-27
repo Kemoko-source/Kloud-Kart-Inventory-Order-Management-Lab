@@ -25,6 +25,8 @@ services:
 
   # Runs the unmodified race_test.py against the db service.
   # Usage: docker compose run --rm racetest
+  # Our own concurrency tests run in the same image:
+  #        docker compose run --rm --entrypoint python racetest /tests/cancel_race_test.py
   racetest:
     profiles: ["test"]
     build:
@@ -34,6 +36,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     volumes:
       - ./M03_Resources:/app:ro
+      - ./tests:/tests:ro
     working_dir: /app
     depends_on:
       db:
