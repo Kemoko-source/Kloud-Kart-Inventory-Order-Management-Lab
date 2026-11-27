@@ -2,7 +2,7 @@
 # Rebuild Kloud Kart's database from a fresh load, then apply every solution
 # script in order. Safe to re-run: schema.sql drops and recreates the tables.
 #
-# Usage (from the repo root, with the db container running):
+# Usage (from the repo root):
 #     ./scripts/rebuild.sh
 set -euo pipefail
 # Git Bash on Windows rewrites container paths like /workspace into Windows
@@ -11,6 +11,11 @@ export MSYS_NO_PATHCONV=1
 
 cd "$(dirname "$0")/.."
 set -a; source .env; set +a
+
+# Start the database if needed and wait for its health check: right after
+# `docker compose up -d`, PostgreSQL is still initialising and refuses
+# connections. A no-op when it is already up.
+docker compose up -d --wait db
 
 psql_in_db() {
     # -w /workspace/... so relative paths inside the SQL files resolve.

@@ -4,7 +4,7 @@
 -- spend for the trailing 12 months, a running per-customer total and a top-100
 -- ranking. (Today it takes about 40 minutes and some Mondays never finishes.)
 --
--- Definitions (the brief leaves these open; see docs/02_design_decisions.md):
+-- Definitions (the brief leaves these open; see decisions/ADR-005-monday-report-definitions.md):
 --   spent             total_amount of orders with status completed or shipped.
 --                     Pending orders are excluded: they average 110 days old,
 --                     the same as completed ones, so "pending" means stuck,
@@ -108,7 +108,7 @@ COMMENT ON FUNCTION customer_monthly_spend(date) IS
 -- ---------------------------------------------------------------------------
 -- monday_customer_report: Adwoa's report, one row per customer.
 -- monthly_spend[1] is the oldest month (window_start), [12] the most recent.
--- accounts_sharing_email flags people with several accounts (diagnosis #9),
+-- accounts_sharing_email flags people with several accounts (F-10),
 -- whose spend is split across rows; they are not merged automatically.
 -- ---------------------------------------------------------------------------
 CREATE FUNCTION monday_customer_report(p_as_of date DEFAULT current_date)

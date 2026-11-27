@@ -1,11 +1,11 @@
 -- 20_clean.sql
--- Fixes the findings in docs/01_data_diagnosis.md that threaten Nana's numbers.
+-- Fixes the findings in data_findings.md that threaten Nana's numbers.
 --
 -- One transaction: either every fix lands and every invariant at the bottom
 -- holds, or nothing changes. Every removed row goes to data_quarantine and
 -- every changed value to data_corrections (see 10_foundations.sql).
 --
--- Deliberately NOT changed (see the diagnosis, "looks wrong but is not"):
+-- Deliberately NOT changed (see data_findings.md, "Looked wrong, is not wrong"):
 -- historical unit prices, duplicate product names, order timestamps' time
 -- zone, totals that are exact percentage adjustments of their lines, and
 -- customer name capitalisation.
@@ -14,12 +14,12 @@
 
 -- Quantities at or above this are treated as keystroke errors. Evidence: the
 -- 99.9th percentile of order_items.quantity is 10; the six lines above it are
--- 999 or 9,999 (diagnosis D5).
+-- 999 or 9,999 (F-06).
 \set implausible_qty 100
 
 -- Last moment of normal trading in the extract. Evidence: about 400 orders a
 -- day up to 2026-08-31, then a gap, then 24 isolated orders into 2027, all
--- with whole-minute timestamps against 1.68% of normal orders (diagnosis D10).
+-- with whole-minute timestamps against 1.68% of normal orders (F-12).
 \set extract_end '2026-08-31 23:59:59'
 
 BEGIN;
@@ -27,7 +27,7 @@ BEGIN;
 SELECT set_config('kloudkart.implausible_qty', :'implausible_qty', true);
 
 -- ===========================================================================
--- D2  Order status: 15 spellings -> 5 statuses
+-- F-02  Order status: 15 spellings -> 5 statuses
 -- ===========================================================================
 CREATE TEMP TABLE status_map ON COMMIT DROP AS
 SELECT DISTINCT status AS raw_status,
@@ -53,9 +53,9 @@ WHERE m.raw_status = o.status
   AND m.raw_status <> m.canonical_status;
 
 -- ===========================================================================
--- D11 Contact data: trimmed lower-case emails, one phone format, one city spelling.
+-- F-13 Contact data: trimmed lower-case emails, one phone format, one city spelling.
 -- Logged as one summary row per column; per-row history would be noise.
--- Names are left as entered (cosmetic, diagnosis #12).
+-- Names are left as entered (cosmetic, F-14).
 -- ===========================================================================
 CREATE TEMP TABLE contact_fix ON COMMIT DROP AS
 SELECT customer_id,
@@ -99,7 +99,7 @@ WHERE f.customer_id = c.customer_id
   AND (c.email, c.city, c.phone) IS DISTINCT FROM (f.new_email, f.new_city, f.new_phone);
 
 -- ===========================================================================
--- D4  Category tree: break the 9001 <-> 9002 loop, root the dangling branch.
+-- F-05  Category tree: break the 9001 <-> 9002 loop, root the dangling branch.
 -- Promotions (9002) is the general category and Seasonal Promotions (9001)
 -- the specific one, so 9001 stays under 9002 and 9002 becomes a root.
 -- ===========================================================================
@@ -127,7 +127,7 @@ SELECT 'categories', category_id, 'parent_id', old_parent_id::text, NULL, 'categ
 FROM fixed;
 
 -- ===========================================================================
--- D5  Implausible quantities. None of these lines is included in its order's
+-- F-06  Implausible quantities. None of these lines is included in its order's
 -- total_amount, so the true quantity is recoverable where
 --     (total_amount - value of the order's other lines) / unit_price
 -- is a whole number. Recoverable lines are corrected; the rest quarantined.
@@ -174,7 +174,7 @@ SELECT 'order_items', order_item_id, 'implausible_quantity',
 FROM moved;
 
 -- ===========================================================================
--- D7  Duplicate order lines. Quarantine a later exact copy of a line only
+-- F-08  Duplicate order lines. Quarantine a later exact copy of a line only
 -- where the order total proves the copy was never charged.
 -- ===========================================================================
 CREATE TEMP TABLE duplicate_lines ON COMMIT DROP AS
@@ -218,7 +218,7 @@ SELECT 'order_items', order_item_id, 'duplicate_line',
 FROM moved;
 
 -- ===========================================================================
--- D6  Orphans. Each sits in an ID range outside the real one (test or
+-- F-07  Orphans. Each sits in an ID range outside the real one (test or
 -- migration residue). Children move with their parent order.
 -- ===========================================================================
 WITH moved AS (
@@ -237,7 +237,7 @@ SELECT o.order_id, 'orphan_customer' AS reason_code,
 FROM orders o
 WHERE NOT EXISTS (SELECT 1 FROM customers c WHERE c.customer_id = o.customer_id)
 UNION ALL
--- D10 Orders dated after the extract ends: their real date is unknowable.
+-- F-12 Orders dated after the extract ends: their real date is unknowable.
 SELECT o.order_id, 'date_after_extract',
        format('order_date %s is after the extract ends (%s)', o.order_date, :'extract_end')
 FROM orders o
@@ -277,7 +277,7 @@ SELECT 'inventory_log', log_id, 'orphan_product',
 FROM moved;
 
 -- ===========================================================================
--- D3  Stock counter vs ledger. The counter is kept: for 42 of the drifting
+-- F-04  Stock counter vs ledger. The counter is kept: for 42 of the drifting
 -- products the gap equals exactly the units sold with no movement row, i.e.
 -- the counter moved and the ledger write was lost. One labelled correction
 -- per product brings the ledger level with the counter, so from here on
@@ -309,7 +309,7 @@ SELECT 'products', product_id, 'stock_quantity', ledger_net::text, stock_quantit
 FROM stock_drift;
 
 -- ===========================================================================
--- D1  Negative stock: units that were sold but never existed. The shelf
+-- F-01  Negative stock: units that were sold but never existed. The shelf
 -- cannot hold less than nothing, so stock goes to 0 through a movement the
 -- auditor can see, and the product joins the recount list.
 -- ===========================================================================

@@ -3,7 +3,7 @@
 -- marketing keeps adding subcategories? Builds a synthetic tree far larger
 -- and deeper than today's, times the views, and rolls everything back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/low_stock_at_scale.sql
+--     docker compose exec -T db psql -f /workspace/benchmarks/low_stock_at_scale.sql
 
 \set ON_ERROR_STOP on
 \set levels                  10

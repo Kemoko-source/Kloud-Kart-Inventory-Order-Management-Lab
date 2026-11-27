@@ -4,8 +4,7 @@
 --
 -- Status and movement reasons use CHECK lists rather than lookup tables: the
 -- vocabularies are small and stable, the movement rule needs a CHECK anyway
--- (sign depends on reason), and adding a value is one ALTER, documented in
--- docs/02_design_decisions.md.
+-- (sign depends on reason), and adding a value is one ALTER TABLE.
 
 \set ON_ERROR_STOP on
 
@@ -108,13 +107,13 @@ ALTER TABLE inventory_log
     ADD CONSTRAINT inventory_log_product_fk FOREIGN KEY (product_id) REFERENCES products (product_id);
 CREATE INDEX inventory_log_product_time_idx ON inventory_log (product_id, created_at);
 
--- Duplicate accounts (diagnosis #9) are not merged, so email cannot be
+-- Duplicate accounts (F-10) are not merged, so email cannot be
 -- UNIQUE yet; this index makes finding an account by email fast meanwhile.
 CREATE INDEX customers_email_idx ON customers (email);
 
 -- ---------------------------------------------------------------------------
 -- Category tree guard. A foreign key cannot stop A -> B -> A, and a loop makes
--- every recursive rollup run forever (diagnosis D4). This trigger walks up
+-- every recursive rollup run forever (F-05). This trigger walks up
 -- from the proposed parent and refuses the change if it reaches the row
 -- itself. A transaction-level advisory lock serialises tree edits so two
 -- concurrent edits cannot each pass the check and together close a loop.

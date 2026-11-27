@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Before/after timing of the Monday report, written to
-# docs/evidence/report_benchmark.txt.
+# evidence/report_benchmark.txt.
 #
 #   before  the extract exactly as delivered (fresh load, no indexes, messy
 #           statuses) with the report written as per-customer sub-queries
@@ -20,7 +20,7 @@ set -a; source .env; set +a
 
 raw_db="${POSTGRES_DB}_raw"
 raw_sample=20
-out="docs/evidence/report_benchmark.txt"
+out="evidence/report_benchmark.txt"
 mkdir -p "$(dirname "$out")"
 
 psql_db() {

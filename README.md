@@ -1,8 +1,9 @@
 # Kloud Kart — Inventory & Order Management
 
-Kloud Kart Ltd. (Accra, ~4,000 orders/day) runs on a single PostgreSQL server
+Kloud Kart Ltd. (Accra, ~4,000 orders a day) runs on a single PostgreSQL server
 with a schema that was never redesigned. This repository answers the four
-things operations lead Nana Adjei asked for:
+things operations lead Nana Adjei asked for, on that same server with no new
+infrastructure:
 
 1. **No overselling**: two buyers racing for the last unit, exactly one wins,
    the other gets an instant "out of stock".
@@ -11,23 +12,21 @@ things operations lead Nana Adjei asked for:
 3. **Low-stock visibility** rolled up through a category tree of any depth.
 4. **An audit trail** of every stock movement.
 
-Everything runs on plain PostgreSQL: no new infrastructure.
+## Deliverables
 
-## Repository layout
-
-| Path | Contents |
+| Brief asks for | Where |
 |---|---|
-| `M03_Resources/` | The data bundle exactly as provided: schema, load script, CSVs and `race_test.py` (unmodified) |
-| `sql/` | Solution scripts, applied in numeric order after a fresh load |
-| `diagnosis/` | Read-only SQL checks behind every number in the diagnosis |
-| `docs/` | Data diagnosis, design decisions, memo to Nana |
-| `scripts/rebuild.sh` | Fresh load plus every solution script, top to bottom |
-| `tests/` | Container definition for running `race_test.py` |
+| Written diagnosis of the data, ranked by danger | [`data_findings.md`](data_findings.md), evidence in [`diagnosis/diagnosis_checks.sql`](diagnosis/diagnosis_checks.sql) |
+| Working SQL solution, top to bottom from a fresh load | [`sql/`](sql/), applied by [`scripts/rebuild.sh`](scripts/rebuild.sh) |
+| Explanation of key decisions | [`decisions/`](decisions/): six ADRs |
+| One-page memo to Nana | [`client_memo.md`](client_memo.md) |
+| One improvement beyond the brief, built | [`improvement.md`](improvement.md) and [`sql/80_cancel_order.sql`](sql/80_cancel_order.sql) |
+| Performance backed by before/after measurement | [`measurements/`](measurements/): order placement, low-stock rollup, Monday report |
 
 ## Prerequisites
 
-- Docker Desktop (running)
-- Git Bash or any POSIX shell, for `scripts/rebuild.sh`
+- Docker Desktop, running
+- Git Bash or any POSIX shell, for the scripts
 
 You do not need `psql` or Python on the host: both run inside containers.
 
@@ -35,44 +34,53 @@ You do not need `psql` or Python on the host: both run inside containers.
 
 ```bash
 cp .env.example .env              # then set your own POSTGRES_PASSWORD
-docker compose up -d db           # PostgreSQL 18 with max_connections=500
-./scripts/rebuild.sh              # fresh load + all solution scripts
+./scripts/rebuild.sh              # starts PostgreSQL 18, waits until ready, fresh load + all solution scripts
+./scripts/run_tests.sh            # every test, including the unmodified race_test.py
 ```
 
-`rebuild.sh` refuses to run unless `SHOW max_connections` returns at least 500.
-`race_test.py` opens 400 connections at once, and on PostgreSQL's default of
-100 its flash-sale test hangs.
+The first run downloads the PostgreSQL and Python images; after that a
+rebuild takes about 15 seconds.
 
-If you already run the course's `kloudkart` container on port 5432, stop it
-(`docker stop kloudkart`) or set `POSTGRES_PORT` in `.env` to a free port.
+`rebuild.sh` refuses to run unless `SHOW max_connections` returns at least 500:
+`race_test.py` opens 400 connections at once, and on PostgreSQL's default of 100
+its flash-sale test hangs. If you already run the course's `kloudkart`
+container on port 5432, stop it or set `POSTGRES_PORT` in `.env` to a free port.
 
-## Data diagnosis
+## Repository layout
 
-Ranked findings are in [`docs/01_data_diagnosis.md`](docs/01_data_diagnosis.md).
-Reproduce every number from a fresh load (read-only, about 5 seconds):
-
-```bash
-docker compose exec -T db psql -U kloudkart -d kloudkart \
-    -f /workspace/diagnosis/diagnosis_checks.sql
-```
+| Path | Contents |
+|---|---|
+| `M03_Resources/` | The data bundle exactly as provided: schema, load script, CSVs and `race_test.py`, all unmodified |
+| `sql/` | Solution scripts, applied in numeric order after a fresh load |
+| `tests/` | SQL tests (each in a rolled-back transaction), a concurrency test for cancellations, and the test container definition |
+| `diagnosis/` | Read-only checks behind every number in `data_findings.md` |
+| `decisions/` | Architecture decision records |
+| `measurements/` | Measurement reports against the brief's targets |
+| `benchmarks/` | Queries used by the measurements (naive "before" versions, synthetic scale-ups) |
+| `experiments/` | The triggers-only design, used to test whether triggers would have fixed overselling |
+| `evidence/` | Captured output of the benchmark and experiment scripts |
+| `scripts/` | Rebuild, test, benchmark and experiment runners |
 
 ## Solution scripts
-
-Applied in order by `scripts/rebuild.sh` after the fresh load. Design
-reasoning is in [`docs/02_design_decisions.md`](docs/02_design_decisions.md).
 
 | Script | What it does |
 |---|---|
 | `sql/10_foundations.sql` | Audit tables (`data_quarantine`, `data_corrections`) and identity columns for safe ID generation |
-| `sql/20_clean.sql` | Fixes the diagnosed problems in one transaction, recording every removal and correction, then checks invariants; creates the `products_to_recount` view |
+| `sql/20_clean.sql` | Fixes the findings in one transaction, recording every removal and correction, then checks invariants; creates the `products_to_recount` view |
 | `sql/30_constraints.sql` | Foreign keys with their indexes, CHECK rules, NOT NULLs, and a trigger that refuses category loops |
 | `sql/40_audit_trail.sql` | Links each sale movement to its order; makes `inventory_log` append-only and archives any deletion |
 | `sql/50_place_order.sql` | `place_order()`: atomic, oversell-proof order placement with a clean "out of stock" |
 | `sql/60_low_stock.sql` | Per-product `reorder_level`; views `category_tree`, `low_stock_by_category` (rollup at any depth) and `low_stock_products` (drill-down) |
 | `sql/70_monday_report.sql` | `monday_customer_report()` and the monthly detail behind it, `customer_monthly_spend()` |
-| `sql/80_cancel_order.sql` | Improvement beyond the brief: `cancel_order()` returns exactly the stock a pending order took, with a `cancellation` movement |
+| `sql/80_cancel_order.sql` | Improvement beyond the brief: `cancel_order()` returns exactly the stock a pending order took |
 
-## Placing and cancelling orders
+## Using it
+
+```bash
+docker compose exec db psql
+```
+
+**Placing and cancelling orders**
 
 ```sql
 -- Sample output; your order_id will differ.
@@ -85,7 +93,7 @@ SELECT * FROM cancel_order(p_order_id => 1000123, p_note => 'customer changed th
 --  t       |              2 | Order 1000123 cancelled; 2 unit(s) returned to stock
 ```
 
-## Running the Monday report
+**The Monday report**
 
 ```sql
 -- Top 100, as of a given Monday (defaults to today)
@@ -104,7 +112,7 @@ ORDER BY month;
 `monthly_spend[1]` is the oldest of the 12 months (`window_start`) and
 `monthly_spend[12]` the most recent.
 
-## Using the low-stock views
+**Low stock**
 
 ```sql
 -- At a glance: the tree, each category covering its whole subtree
@@ -113,58 +121,39 @@ SELECT path, products, out_of_stock, low_stock FROM low_stock_by_category ORDER 
 -- Drill down: most urgent first
 SELECT product_name, category_path, stock_quantity, reorder_level, stock_status
 FROM low_stock_products ORDER BY units_below_reorder_level DESC LIMIT 50;
+
+-- Shelves to count first: figures reconciled or inferred during the clean-up
+SELECT product_id, product_name, stock_quantity, reasons FROM products_to_recount;
 ```
 
 ## Tests
 
-```bash
-./scripts/run_tests.sh
-```
+`./scripts/run_tests.sh` runs:
 
-This runs:
-
-- `tests/constraints_test.sql`: the schema refuses each diagnosed problem
+- `tests/constraints_test.sql`: the schema refuses each finding
 - `tests/place_order_test.sql`: refusals, linked writes, append-only ledger
 - `tests/low_stock_test.sql`: rollup arithmetic at every node, any depth, still answers with a loop in the tree
 - `tests/monday_report_test.sql`: report totals against a direct count, and each definition at its boundary
-- `tests/cancel_order_test.sql`: cancellations return exactly the ledger's stock, refusals, multi-product orders
-- `race_test.py`, unmodified: concurrency under contention
+- `tests/cancel_order_test.sql`: cancellations return exactly the ledger's stock
+- `race_test.py`, unmodified: order placement under contention
 - `tests/cancel_race_test.py`: simultaneous cancellations, cancelling during a flash sale, no deadlocks
 
-The SQL tests run in rolled-back transactions and leave no trace.
-
-To run the concurrency test on its own:
+Each SQL test has a 2-minute statement timeout, so a bad query plan fails
+instead of hanging. To run the provided concurrency test on its own:
 
 ```bash
 docker compose run --rm racetest              # all four tests
 docker compose run --rm racetest --test 2     # flash sale only
 ```
 
-## Benchmarks
+## Measurements, benchmarks and the triggers experiment
 
 ```bash
-# Low-stock rollup on a synthetic tree 50x today's size (rolled back afterwards)
-docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/low_stock_at_scale.sql
+./scripts/run_measurements.sh       # repeated runs behind measurements/, written to evidence/
+./scripts/run_report_benchmark.sh   # Monday report: raw extract + naive query vs final
+./scripts/run_trigger_experiment.sh # race_test.py against a triggers-only design, in a throwaway database
 
-# Monday report: raw extract + naive query vs final (writes docs/evidence/report_benchmark.txt)
-./scripts/run_report_benchmark.sh
-
-# Monday report at about 10x today's order volume (rolled back afterwards)
-docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/report_at_scale.sql
-```
-
-## Experiment: would triggers alone have fixed overselling?
-
-```bash
-./scripts/run_trigger_experiment.sh
-```
-
-This runs the unmodified `race_test.py` against a triggers-only design, in a
-throwaway copy of the database. Results are written to `docs/evidence/`, and
-are discussed in section 2.3 of the design decisions.
-
-## Connecting manually
-
-```bash
-docker compose exec db psql -U kloudkart -d kloudkart
+# Synthetic scale-ups, rolled back afterwards
+docker compose exec -T db psql -f /workspace/benchmarks/low_stock_at_scale.sql
+docker compose exec -T db psql -f /workspace/benchmarks/report_at_scale.sql
 ```

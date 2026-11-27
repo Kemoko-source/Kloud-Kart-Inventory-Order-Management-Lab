@@ -1,0 +1,40 @@
+Measurements, 2026-11-27 07:40 UTC
+PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5), max_connections 500, server settings otherwise default
+Docker VM: 8 CPUs, 16653119488 bytes RAM, Docker Desktop on Windows 11
+
+== ORDER PLACEMENT
+-- warm connection, one call at a time, place_order() that sells (300 calls)
+   runs 300   median 2.4 ms   p95 3.0 ms   worst 7.4 ms
+-- warm connection, one call at a time, place_order() that refuses (300 calls)
+   runs 300   median 0.1 ms   p95 0.2 ms   worst 0.3 ms
+-- race_test.py flash sale, 400 new connections at once, 5 runs: buyers who got a unit
+   runs 250   median 393.8 ms   p95 706.5 ms   worst 909.5 ms
+-- same runs: buyers told out of stock
+   runs 1750   median 1105.4 ms   p95 1591.7 ms   worst 1805.4 ms
+-- same runs: totals
+   250 sold, 1750 refused, 0 errors across 5 runs
+-- race_test.py full suite: passed 10 of 10 consecutive runs
+
+== LOW-STOCK ROLLUP
+-- today's data: full rollup, every category
+   first run in a fresh session: 6.1 ms
+   warm: 3.508 3.444 3.230 3.396 3.282 3.242 3.142 3.919 3.191 3.205
+   runs 10   median 3.3 ms   p95 3.9 ms   worst 3.9 ms
+-- today's data: drill-down, 50 most urgent products
+   first run in a fresh session: 5.6 ms
+   warm: 2.311 2.379 2.302 2.131 2.227 2.340 2.374 2.218 2.084 2.228
+   runs 10   median 2.3 ms   p95 2.4 ms   worst 2.4 ms
+-- 50x today's size (5,095 categories, 11 levels, 204,023 products): full rollup, 3 runs
+   runs 3   median 174.9 ms   p95 306.5 ms   worst 306.5 ms
+
+== MONDAY REPORT
+-- today's data: every customer, every column
+   first run in a fresh session: 1994.0 ms
+   warm: 1475.047 1645.836 2035.016 2015.675 1782.121 1561.679 1545.389 1601.149 1551.453 1568.973
+   runs 10   median 1585.1 ms   p95 2035.0 ms   worst 2035.0 ms
+-- today's data: top 100 only
+   first run in a fresh session: 1684.8 ms
+   warm: 1354.156 1308.568 1288.773 1545.705 1582.471 1392.828 1400.002 1358.481 1336.855 1394.674
+   runs 10   median 1375.7 ms   p95 1582.5 ms   worst 1582.5 ms
+-- ~10x today's volume (1.6M orders, 100,420 customers): every customer, 3 runs x 2
+   runs 6   median 6307.7 ms   p95 8439.6 ms   worst 8439.6 ms

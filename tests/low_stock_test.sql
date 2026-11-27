@@ -3,7 +3,7 @@
 -- at any depth, and cannot hang even if a loop gets into the tree.
 -- Runs in one transaction that is rolled back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/low_stock_test.sql
+--     docker compose exec -T db psql -f /workspace/tests/low_stock_test.sql
 
 \set ON_ERROR_STOP on
 \set QUIET on

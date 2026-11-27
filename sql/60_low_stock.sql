@@ -3,7 +3,7 @@
 -- nested category tree (Electronics -> Phones -> Phone Accessories -> Cases),
 -- in a couple of seconds. The tree's depth is never assumed.
 --
--- What "low" means (the brief leaves it open; see docs/02_design_decisions.md):
+-- What "low" means (the brief leaves it open; see decisions/ADR-004-low-stock-rollup.md):
 --   out of stock   stock_quantity = 0
 --   low            0 < stock_quantity <= reorder_level
 -- reorder_level is per product and starts at two weeks of that product's own

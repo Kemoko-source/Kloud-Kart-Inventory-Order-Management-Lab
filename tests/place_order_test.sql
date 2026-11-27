@@ -3,7 +3,7 @@
 -- race_test.py does not cover. Concurrency itself is race_test.py's job.
 -- Runs in one transaction that is rolled back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/place_order_test.sql
+--     docker compose exec -T db psql -f /workspace/tests/place_order_test.sql
 
 \set ON_ERROR_STOP on
 \set QUIET on

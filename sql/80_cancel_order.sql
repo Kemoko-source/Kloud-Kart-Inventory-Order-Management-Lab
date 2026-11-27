@@ -1,7 +1,7 @@
 -- 80_cancel_order.sql
 -- Improvement beyond the brief: cancelling an order gives its stock back.
 --
--- Why it is needed. place_order() takes stock at checkout (decision 2.6), so
+-- Why it is needed. place_order() takes stock at checkout (decisions/ADR-002-atomic-stock-decrement-at-checkout.md), so
 -- a pending order holds real units. Without a cancellation path, every
 -- cancelled order would keep its units off the shelf forever, and the stock
 -- figures would drift back to the untrustworthy state Nana started from.

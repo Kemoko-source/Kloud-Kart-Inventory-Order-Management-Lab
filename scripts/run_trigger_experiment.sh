@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the unmodified race_test.py against the "triggers only" design
 # (experiments/trigger_only.sql), in both variants, each in a throwaway copy
-# of the database. Results are written to docs/evidence/.
+# of the database. Results are written to evidence/.
 #
 # Usage (from the repo root, after ./scripts/rebuild.sh):
 #     ./scripts/run_trigger_experiment.sh
@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 set -a; source .env; set +a
 
 experiment_db="${POSTGRES_DB}_trigger_experiment"
-evidence_dir="docs/evidence"
+evidence_dir="evidence"
 mkdir -p "$evidence_dir"
 
 psql_admin() {

@@ -11,6 +11,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      # Defaults for psql inside the container, so `docker compose exec db psql`
+      # connects as the .env user to the .env database without naming either.
+      PGUSER: ${POSTGRES_USER}
+      PGDATABASE: ${POSTGRES_DB}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -37,6 +41,7 @@ services:
     volumes:
       - ./M03_Resources:/app:ro
       - ./tests:/tests:ro
+      - ./benchmarks:/benchmarks:ro
     working_dir: /app
     depends_on:
       db:

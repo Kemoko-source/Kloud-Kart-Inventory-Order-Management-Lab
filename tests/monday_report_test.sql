@@ -4,7 +4,7 @@
 -- at the boundaries, and the summary agrees with the monthly detail.
 -- Runs in one transaction that is rolled back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/monday_report_test.sql
+--     docker compose exec -T db psql -f /workspace/tests/monday_report_test.sql
 
 \set ON_ERROR_STOP on
 \set QUIET on

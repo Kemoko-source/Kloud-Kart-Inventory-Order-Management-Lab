@@ -2,7 +2,7 @@
 -- Single-session behaviour of cancel_order(). Concurrency is covered by
 -- tests/cancel_race_test.py. Runs in one transaction that is rolled back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/tests/cancel_order_test.sql
+--     docker compose exec -T db psql -f /workspace/tests/cancel_order_test.sql
 
 \set ON_ERROR_STOP on
 \set QUIET on

@@ -4,7 +4,7 @@
 -- roughly 10x the extract. This adds synthetic customers and a year of orders
 -- at that rate inside a transaction, times the report, and rolls back.
 --
---     docker compose exec -T db psql -U kloudkart -d kloudkart -f /workspace/benchmarks/report_at_scale.sql
+--     docker compose exec -T db psql -f /workspace/benchmarks/report_at_scale.sql
 
 \set ON_ERROR_STOP on
 \set extra_customers  60000
